@@ -39,6 +39,7 @@
             max-width: 540px;
             margin: 0 auto;
             min-height: 100vh;
+            min-height: 100dvh;
             background: var(--bg);
             display: flex;
             flex-direction: column;
@@ -52,7 +53,7 @@
             background: rgba(255, 255, 255, 0.92);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
-            padding: calc(env(safe-area-inset-top, 0px) + 12px) 16px 12px;
+            padding: calc(var(--safe-top, 0px) + 12px) 16px 12px;
             border-bottom: 1px solid var(--line);
         }
 
@@ -233,7 +234,7 @@
         /* ===== 课表 ===== */
         .schedule-wrapper {
             flex: 1;
-            padding: 10px 8px calc(env(safe-area-inset-bottom, 0px) + 8px);
+            padding: 10px 8px calc(var(--safe-bottom, 0px) + 8px);
         }
 
         .schedule {
@@ -399,7 +400,7 @@
 
         /* ===== 底部图例 ===== */
         .footer {
-            padding: 4px 16px calc(env(safe-area-inset-bottom, 0px) + 14px);
+            padding: 4px 16px calc(var(--safe-bottom, 0px) + 14px);
             text-align: center;
             font-size: 10px;
             color: var(--text-2);
@@ -433,6 +434,7 @@
             width: 100%;
             max-width: 540px;
             max-height: 88vh;
+            max-height: 88dvh;
             display: flex;
             flex-direction: column;
             animation: slideUp 0.25s ease;
@@ -464,7 +466,7 @@
         }
 
         .modal-body {
-            padding: 4px 18px calc(env(safe-area-inset-bottom, 0px) + 20px);
+            padding: 4px 18px calc(var(--safe-bottom, 0px) + 20px);
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
         }
@@ -1084,6 +1086,27 @@
             if (e.target === this) closeModal();
         });
 
+        // ===== 安全区适配 =====
+        // 安卓 WebView 对 env(safe-area-inset-*) 的上报不可靠：原生容器已经把网页
+        // 排在状态栏下方时（视口高度 < 屏幕高度），这些值仍会被误报，导致页头再
+        // 加一次内边距，出现顶部空白。因此先用探针读出 env 数值，再按实际布局决定是否应用。
+        const safeProbeTop = document.createElement('div');
+        const safeProbeBottom = document.createElement('div');
+        safeProbeTop.style.cssText = 'position:fixed;top:0;left:0;width:0;height:env(safe-area-inset-top,0px);visibility:hidden;pointer-events:none;';
+        safeProbeBottom.style.cssText = 'position:fixed;bottom:0;left:0;width:0;height:env(safe-area-inset-bottom,0px);visibility:hidden;pointer-events:none;';
+        document.body.appendChild(safeProbeTop);
+        document.body.appendChild(safeProbeBottom);
+
+        function applySafeArea() {
+            // 视口比屏幕矮 => 网页本身已避开系统栏，env 值是多余的，直接置 0
+            const inset = window.screen.height - window.innerHeight > 16;
+            const top = inset ? 0 : Math.round(safeProbeTop.getBoundingClientRect().height);
+            const bottom = inset ? 0 : Math.round(safeProbeBottom.getBoundingClientRect().height);
+            document.documentElement.style.setProperty('--safe-top', top + 'px');
+            document.documentElement.style.setProperty('--safe-bottom', bottom + 'px');
+        }
+        applySafeArea();
+
         // ===== 动态计算尺寸 =====
         function updateHeaderH() {
             const h = document.querySelector('.header').offsetHeight;
@@ -1103,7 +1126,7 @@
             const h = Math.max(58, Math.min(Math.floor(avail / 8), 96));
             document.documentElement.style.setProperty('--cell-h', h + 'px');
         }
-        window.addEventListener('resize', () => { updateHeaderH(); updateCellH(); });
+        window.addEventListener('resize', () => { applySafeArea(); updateHeaderH(); updateCellH(); });
 
         // 初始化：自动定位到今天所在周
         updateHeaderH();
